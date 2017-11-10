@@ -130,20 +130,23 @@ __global__ void mm_kernel(matrix a, matrix b, matrix result, int size)
 	int k, l;
 	float value = 0;
 	for(l = 0; l < size / 32; l++){
-		__shared__ float subA[32][32];
-		__shared__ float subB[32][32];
+		__shared__ float subA[32][64];
+		__shared__ float subB[64][32];
 		
-		subA[threadIdx.x][threadIdx.y] = a.element[blockIdx.y * 32 + threadIdx.x][l * 32 + threadIdx.y];  
-		subB[threadIdx.x][threadIdx.y] = b.element[l * 32 + threadIdx.x][blockIdx.x * 32 + threadIdx.y];  
+		subA[threadIdx.y][threadIdx.x] = a.element[blockIdx.y * 32 + threadIdx.y][l * 32 + threadIdx.x];  
+		subB[threadIdx.y][threadIdx.x] = b.element[l * 32 + threadIdx.y][blockIdx.x * 32 + threadIdx.x];  
 
+		subA[threadIdx.y][threadIdx.x + 32] = a.element[blockIdx.y * 32 + threadIdx.y][l * 32 + threadIdx.x];  
+		subB[threadIdx.y + 32][threadIdx.x] = b.element[l * 32 + threadIdx.y][blockIdx.x * 32 + threadIdx.x];  
+		
 		__syncthreads();
-	
-		for(k = 0; k < 32; k++)
-			value += subA[threadIdx.x][k] * subB[k][threadIdx.y];
-	
+
+		for(k = threadIdx.x; k < 32 + threadIdx.x; k++){
+			value += subA[threadIdx.y][k] * subB[k][threadIdx.x];
+		}
 		__syncthreads();
 	}
-	result.element[blockIdx.y * 32 + threadIdx.x][blockIdx.x * 32 + threadIdx.y] = value;
+	result.element[blockIdx.y * 32 + threadIdx.y][blockIdx.x * 32 + threadIdx.x] = value;
 }
 
 void print_matrix(matrix m)
